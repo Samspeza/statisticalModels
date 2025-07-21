@@ -1,0 +1,263 @@
+---
+title: "Séries Temporais"
+output: html_notebook
+---
+
+# **Séries Temporais**
+
+## TRANSFORMAÇÃO E DIFERENCIAÇÃO
+
+```{r}
+library(tseries)
+library(ggplot2)
+library(forecast)
+library(readr)
+library(car)
+library(urca)
+library(dplyr)
+```
+
+### **Transformação**
+
+Transformar a série que não tenha distribuição normal em uma série com distribuição aproximadamente normal
+
+**AirPassengers: dados clássicos da companhia aérea Box & Jenkins. Totais mensais de passageiros de companhias aéreas internacionais, 1949 a 1960.**
+
+```{r}
+dados <- read_csv('AirPassengers.csv')
+head(dados)
+
+serie <- ts(dados$Passengers, start=c(1949,1), frequency=12)
+plot.ts(serie, main="AirPassengers", ylab="Número de Passageiros", col="blue")
+```
+
+Tendencia crescente ao longo dos anos e sazonalidade clara, onde de tempos em tempos (regulares) há picos bem marcados. Esses picos começam com uma amplitude pequena e vai aumentando ao passar dos anos.
+
+***Verificando a normalidade dos dados***
+
+```{r}
+qqnorm(serie)
+qqline(serie, col = "red")
+#title("Normal QQ plot")
+```
+
+Serie aparentemente demonstra problemas de normalidade no começo e um pouco no final, pois é onde ela se distancia da linha.
+
+**Teste Shapiro-Wilk**
+
+CRITÉRIOS:
+
+NÍVEL DE SIGNIFICÂNCIA DE 0,05 ou 5% (MAIS UTILIZADO)
+
+-   H0: A série segue uma distribuição aproximadamente normal QUANDO p \> 0,05.
+-   Ha: A série NÃO segue uma distribuição aproximadamente normal QUANDO p \< 0,05.
+
+```{r}
+shapiro_test <- shapiro.test(as.numeric(serie))
+print(shapiro_test)
+```
+
+Como p é menor que 0,05 podemos dizer que a distribuição não é normal.
+
+Para tentarmos resolver esse problema podemos utilizar a transformação logarítmica ou exponencial
+
+### Transformação por log
+
+Diminui variância e melhora normalidade
+
+Aplica a função logarítmica em todos os dados da série
+
+```{r}
+serie_log <- log(serie)
+plot.ts(serie_log, main="Série Transformada por Log", ylab="Log(Número de Passageiros)", col="blue")
+
+qqnorm(serie_log)
+qqline(serie_log, col = "red")
+#title("Normal QQ plot")
+```
+
+Observa-se que o início da série há uma aproximação com a linha de referência, porém no fim da série houve um afastamento maior. Há uma possível melhoria na normalidade dos dados.
+
+**Teste Shapiro-Wilk**
+
+CRITÉRIOS:
+
+NÍVEL DE SIGNIFICÂNCIA DE 0,05 ou 5% (MAIS UTILIZADO)
+
+-   H0: A série segue uma distribuição aproximadamente normal QUANDO p \> 0,05.
+-   Ha: A série NÃO segue uma distribuição aproximadamente normal QUANDO p \< 0,05.
+
+```{r}
+shapiro_test_log <- shapiro.test(as.numeric(serie_log))
+print(shapiro_test_log)
+```
+
+Observa-se uma melhoria na normalidade pela proximidade do p-valor com o nível de significância, porém ainda não temos dados normais.
+
+### Transformação por raiz cúbica
+
+Transformação muito utilizada quando a série possui dados com valor zero ou negativos
+
+```{r}
+serie_cubic <- (serie)^(1/3)
+plot.ts(serie_cubic, main="Série Transformada por Raiz Cúbica", ylab="Raiz Cúbica(Número de Passageiros)", col="blue")
+
+qqnorm(serie_cubic)
+qqline(serie_cubic, col = "red")
+#title("Normal QQ plot")
+```
+
+Ajusta melhor o final da série, porém no início ainda existe um afastamento da linha de referência. Aparentemente melhorou a normalidade da série.
+
+**Teste Shapiro-Wilk**
+
+CRITÉRIOS:
+
+NÍVEL DE SIGNIFICÂNCIA DE 0,05 ou 5% (MAIS UTILIZADO)
+
+-   H0: A série segue uma distribuição aproximadamente normal QUANDO p \> 0,05.
+-   Ha: A série NÃO segue uma distribuição aproximadamente normal QUANDO p \< 0,05.
+
+```{r}
+shapiro_test_cubic <- shapiro.test(as.numeric(serie_cubic))
+print(shapiro_test_cubic)
+```
+
+Verificando a normalidade dos dados com o histograma
+
+```{r}
+library(ggplot2)
+
+# Série original
+ggplot(dados, aes(x=Passengers)) + 
+  geom_histogram(aes(y=..density..), bins=30, fill="blue", alpha=0.5) +
+  geom_density(color="red") +
+  ggtitle("Histograma e Densidade da Série Original")
+
+```
+
+```{r}
+# Série transformada por log
+ggplot(dados, aes(x=log(Passengers))) + 
+  geom_histogram(aes(y=..density..), bins=30, fill="blue", alpha=0.5) +
+  geom_density(color="red") +
+  ggtitle("Histograma e Densidade da Série Transformada por Log")
+
+```
+
+```{r}
+
+# Série transformada por raiz cúbica
+ggplot(dados, aes(x=(Passengers)^(1/3))) + 
+  geom_histogram(aes(y=..density..), bins=30, fill="blue", alpha=0.5) +
+  geom_density(color="red") +
+  ggtitle("Histograma e Densidade da Série Transformada por Raiz Cúbica")
+```
+
+### **DIFERENCIAÇÃO**
+
+Transformar uma série não estacionária em uma série estacionária
+
+```{r}
+# Teste KPSS (Kwiatkowski-Phillips-Schmidt-Shin)
+kpss_test <- ur.kpss(serie)
+summary(kpss_test)
+```
+
+Como temos a estatística do teste KPSS maior que o valor crítico, temos que a série não é estacionária. E a estatística do teste ADF é maior que o valor crítico, temos que a série não é estacionária.
+
+### Fazendo a diferenciação
+
+Lembrando que iremos perder o primeiro valor pois não temos o antecessor para subtrair
+
+```{r}
+serie_diff <- diff(serie)
+
+plot.ts(serie_diff, main="Série Diferenciada", ylab="Diferença de Passageiros", col="blue")
+```
+
+### Teste KPSS e ADF após diferenciação
+
+```{r}
+# Teste KPSS (Kwiatkowski-Phillips-Schmidt-Shin)
+kpss_test_diff <- ur.kpss(serie_diff)
+summary(kpss_test_diff)
+
+```
+
+Como a estatística do teste KPSS é menor que o valor crítico, temos que a série é estacionária. Se não tivesse chegado à estacionaridade, poderíamos realizar a diferenciação de segunda ordem.
+
+### Diferenciação de segunda ordem
+
+```{r}
+serie_diff2 <- diff(serie_diff)
+
+plot.ts(serie_diff2, main="Série Diferenciada de Segunda Ordem", ylab="Diferença de Passageiros", col="blue")
+
+# Teste KPSS (Kwiatkowski-Phillips-Schmidt-Shin)
+kpss_test_diff2 <- ur.kpss(serie_diff2)
+summary(kpss_test_diff2)
+```
+
+### REVERSÃO DA TRANSFORMAÇÃO E DIFERENCIAÇÃO
+
+Ao realizarmos a transformação e diferenciação das séries temporais, alteramos os valores das séries. Para fazermos previsões, temos que realizar a reversão da transformação e diferenciação das séries - queremos fazer previsões na escala original.
+
+#### Transformação por log
+
+```{r}
+serie_log <- log(serie)
+plot.ts(serie_log, main="Série Log", ylab="Número de Passageiros", col="red")
+
+
+# Reversão da transformação por log
+serie_revertida_log <- exp(serie_log)
+plot.ts(serie_revertida_log, main="Série Revertida do Log", ylab="Número de Passageiros", col="blue")
+```
+
+#### Transformação de logaritmo de base 10
+
+```{r}
+serie_log10 <- log10(serie)
+plot.ts(serie_log10, main="Série Logaritmo de Base 10", ylab="Número de Passageiros", col="red")
+
+# Reversão da transformação por logaritmo de base 10
+serie_revertida_log10 <- 10^serie_log10
+plot.ts(serie_revertida_log10, main="Série Revertida do Logaritmo de Base 10", ylab="Número de Passageiros", col="blue")
+```
+
+#### Transformação por raiz cúbica
+
+```{r}
+serie_cubic <- (serie)^(1/3)
+
+plot.ts(serie_cubic, main="Série -  Raiz Cúbica", ylab="Número de Passageiros", col="red")
+
+# Reversão da transformação por raiz cúbica
+serie_revertida_cubic <- serie_cubic^3
+plot.ts(serie_revertida_cubic, main="Série Revertida da Raiz Cúbica", ylab="Número de Passageiros", col="blue")
+```
+
+#### Reversão da Diferenciação
+
+```{r}
+# Diferenciação
+serie_diff <- diff(serie)
+# Reversão da diferenciação
+
+plot.ts(serie_diff, main="Série Revertida da Diferenciação", ylab="Número de Passageiros", col="red")
+
+
+# Reversão da diferenciação
+serie_revertida_diff <- c(NA, serie[-length(serie)] + serie_diff)
+plot.ts(serie_revertida_diff, main="Série Revertida da Diferenciação", ylab="Número de Passageiros", col="blue")
+```
+
+```{r}
+dados <- dados %>% mutate(valores_diferenciados = c(NA, diff(Passengers)))
+
+# Reverter a diferenciação da coluna valores diferenciados e criar mais uma coluna com o nome valores revertidos
+dados <- dados %>% mutate(valores_revertidos = c(NA, Passengers[-length(Passengers)] + valores_diferenciados))
+
+print(dados)
+```

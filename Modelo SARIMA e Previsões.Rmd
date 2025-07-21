@@ -1,0 +1,252 @@
+---
+title: "Modelo SARIMA (p,d,q)x(P,D,Q)"
+output: html_notebook
+---
+
+## Utilizando a série de Passageiros de uma companhia aérea temos o seguinte comportamento:
+
+```{r}
+library(tseries)
+library(forecast)
+x <- AirPassengers
+plot(x, main="Número de Passageiros de Companhia Aérea", ylab="Passageiros", xlab="Ano")
+```
+
+Esta série retrata o número de passageiros que embarcam em um determinado aeroporto. Notamos que no início tem valores mais baixos e uma tendência de alta, além de um ciclo sazonal bem evidente, pois as pessoas tendem a viajar mais no período de verão comparado ao período de inverno.
+
+## Verificação da Estacionaridade da Série
+
+### Teste KPSS
+
+O teste KPSS (Kwiatkowski-Phillips-Schmidt-Shin) é utilizado para verificar a estacionaridade de uma série temporal.
+
+-   **Hipótese Nula (H0)**: A série é estacionária.
+-   **Hipótese Alternativa (Ha)**: A série não é estacionária.
+
+Se o p-valor for menor que 0.05, rejeitamos a hipótese nula e concluímos que a série não é estacionária.
+
+```{r}
+kpss_test <- kpss.test(x)
+print(kpss_test)
+```
+
+Como temos uma série com tendência, já suspeitávamos da inexistência da estacionaridade nesta série.
+
+## Primeira Diferenciação
+
+Vamos realizar uma primeira diferenciação simples para remover a tendência.
+
+```{r}
+serie_dif <- diff(x)
+plot(serie_dif, main="Série Diferenciada (1ª diferença)", ylab="Diferença", xlab="Ano")
+acf(serie_dif, lag.max = 5*12, main="ACF da Série Diferenciada")
+pacf(serie_dif, lag.max = 5*12, main="PACF da Série Diferenciada")
+```
+
+Após aplicar uma diferença simples, removemos a tendência, mas o padrão sazonal ainda é evidente e se repete ao longo do tempo. No gráfico ACF, verificamos que nos lags sazonais a autocorrelação é bastante significativa, e o decaimento sazonal é muito lento. Isso indica que a série ainda pode não ser estacionária devido aos ciclos sazonais.
+
+### Verificação da Estacionaridade da Série Diferenciada
+
+```{r}
+kpss_test_dif <- kpss.test(serie_dif)
+print(kpss_test_dif)
+```
+
+Apesar da série possivelmente não ser estacionária devido à sazonalidade, o teste KPSS não consegue identificar a quebra da estacionaridade. O KPSS pode apresentar resultados inconsistentes para séries sazonais.
+
+## Verificação da Necessidade de Diferenciação Sazonal
+
+Vamos verificar com `nsdiffs` se é necessária alguma diferenciação sazonal.
+
+```{r}
+nsdiffs_test <- nsdiffs(serie_dif)
+print(nsdiffs_test)
+```
+
+Observe que, se aplicarmos `nsdiffs` na série original, teremos que realizar a mesma quantidade de diferenciação sazonal:
+
+```{r}
+nsdiffs_orig <- nsdiffs(x)
+print(nsdiffs_orig)
+```
+
+## Aplicação da Diferenciação Sazonal
+
+Indicamos na `diff` um lag = 12, pois temos dados mensais, e o efeito sazonal é de 12 em 12 meses.
+
+```{r}
+serie_dif_s <- diff(serie_dif, lag = 12)
+plot(serie_dif_s, main="Série Diferenciada Sazonalmente", ylab="Diferença Sazonal", xlab="Ano")
+acf(serie_dif_s, lag.max = 5*12, main="ACF da Série Diferenciada Sazonalmente")
+pacf(serie_dif_s, lag.max = 5*12, main="PACF da Série Diferenciada Sazonalmente")
+```
+
+Agora a série aparenta ser estacionária de fato. O ACF e PACF não mostram mais o comportamento de sazonalidade passando dos limites. Podemos dizer que temos uma série estacionária.
+
+## Identificação da Ordem do Modelo
+
+### Modelos Candidatos
+
+Sabemos que d = 1 e D = 1. Temos que identificar os demais argumentos da ordem do modelo:
+
+-   **p = 1**: ACF decaindo rapidamente para zero e PACF com pequena quebra no lag 1.
+-   **q = 0 ou 1**: PACF com pequena quebra no lag 1.
+-   **P = 0**: ACF e PACF sem autocorrelações nos lags sazonais.
+-   **Q = 0**: ACF e PACF sem autocorrelações nos lags sazonais.
+
+Modelos Candidatos:
+
+-   SARIMA(1,1,0) x (0,1,0)
+-   SARIMA(1,1,1) x (0,1,0)
+
+## Modelo 1: SARIMA(1,1,0) x (0,1,0)
+
+```{r}
+modelo1 <- arima(x, order = c(1,1,0), seasonal = list(order = c(0,1,0), period = 12), include.mean = FALSE)
+print(modelo1)
+```
+
+### Análise de Resíduos
+
+```{r}
+E_mod1 <- modelo1$residuals
+plot(E_mod1, main="Resíduos do Modelo 1", ylab="Resíduos", xlab="Ano")
+```
+
+Observe a quantidade de zeros utilizados para inicializar o modelo, isso ocorre por conta da diferenciação sazonal. Portanto, temos 12 pontos iguais a zero.
+
+Para a análise de resíduos, devemos retirar essas observações para não impactar o resultado das nossas análises.
+
+```{r}
+E_mod1 <- window(E_mod1, start = time(x)[14])
+plot(E_mod1, main="Resíduos Ajustados do Modelo 1", ylab="Resíduos Ajustados", xlab="Ano")
+```
+
+### Análise Gráfica das Suposições dos Resíduos
+
+```{r}
+acf(E_mod1, main="ACF dos Resíduos do Modelo 1")
+pacf(E_mod1, main="PACF dos Resíduos do Modelo 1")
+qqnorm(E_mod1)
+qqline(E_mod1)
+```
+
+Não verificamos nenhuma quebra de pressuposto, apesar de que nos resíduos a partir de 1958, aparenta um padrão de oscilação aumentado. Mas, de qualquer forma, o modelo parece estar se ajustando bem aos dados.
+
+### Testes Estatísticos dos Resíduos
+
+#### Teste de Estacionaridade
+
+```{r}
+kpss_test_mod1 <- kpss.test(E_mod1)
+print(kpss_test_mod1)
+```
+
+#### Teste de Independência
+
+```{r}
+box_test_mod1 <- Box.test(E_mod1, lag = 15, type = "Ljung-Box", fitdf = 1)
+print(box_test_mod1)
+```
+
+#### Teste de Normalidade
+
+```{r}
+shapiro_test_mod1 <- shapiro.test(E_mod1)
+print(shapiro_test_mod1)
+```
+
+## Modelo 2: SARIMA(1,1,1) x (0,1,0)
+
+```{r}
+modelo2 <- arima(x, order = c(1,1,1), seasonal = list(order = c(0,1,0), period = 12), include.mean = FALSE)
+print(modelo2)
+```
+
+### Análise de Resíduos
+
+```{r}
+E_mod2 <- modelo2$residuals
+plot(E_mod2, main="Resíduos do Modelo 2", ylab="Resíduos", xlab="Ano")
+```
+
+Observe a quantidade de zeros utilizados para inicializar o modelo, isso ocorre por conta da diferenciação sazonal. Portanto, temos 12 pontos iguais a zero.
+
+Para a análise de resíduos, devemos retirar essas observações para não impactar o resultado das nossas análises.
+
+```{r}
+E_mod2 <- window(E_mod2, start = time(x)[14])
+plot(E_mod2, main="Resíduos Ajustados do Modelo 2", ylab="Resíduos Ajustados", xlab="Ano")
+```
+
+### Análise Gráfica das Suposições dos Resíduos
+
+```{r}
+acf(E_mod2, main="ACF dos Resíduos do Modelo 2")
+pacf(E_mod2, main="PACF dos Resíduos do Modelo 2")
+qqnorm(E_mod2)
+qqline(E_mod2)
+```
+
+Não verificamos nenhuma quebra de pressuposto, apesar de que nos resíduos a partir de 1958, aparenta um padrão de oscilação aumentado. Mas, de qualquer forma, o modelo parece estar se ajustando bem aos dados.
+
+### Testes Estatísticos dos Resíduos
+
+#### Teste de Estacionaridade
+
+```{r}
+kpss_test_mod2 <- kpss.test(E_mod2)
+print(kpss_test_mod2)
+```
+
+#### Teste de Independência
+
+```{r}
+box_test_mod2 <- Box.test(E_mod2, lag = 15, type = "Ljung-Box", fitdf = 2)
+print(box_test_mod2)
+```
+
+#### Teste de Normalidade
+
+```{r}
+shapiro_test_mod2 <- shapiro.test(E_mod2)
+print(shapiro_test_mod2)
+```
+
+## Comparação dos Modelos
+
+### Modelo 1: SARIMA(1,1,0) x (0,1,
+
+0)  
+
+```{r}
+print(modelo1)
+```
+
+### Modelo 2: SARIMA(1,1,1) x (0,1,0)
+
+```{r}
+print(modelo2)
+```
+
+# Previsão
+
+O R disponibiliza a função nativa predict - Gerando 1 ano de previsão
+
+```{r}
+modelo1 %>% predict(n.ahead = 12) 
+```
+
+Na bilioteca forecats
+
+```{r}
+modelo1 %>% forecast(h = 12, level = 95) %>% plot()
+```
+
+Modelo auto.arima
+
+```{r}
+modelo3 <- auto.arima(AirPassengers)
+print(modelo3)
+modelo3 %>% forecast(h = 12, level = 95) %>% plot()
+```

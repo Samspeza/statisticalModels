@@ -1,0 +1,271 @@
+---
+title: "Modelos ARMA e ARIMA"
+output: html_notebook
+---
+
+# Adequação de Modelos
+
+```{r}
+# Carregando as bibliotecas necessárias
+#install.packages('forecast')
+library(forecast)
+library(tseries)
+library(ggplot2)
+```
+
+## Simulação de um Modelo ARIMA
+
+```{r}
+set.seed(99)
+# Simulando uma série com modelo ARIMA(1,1,1)
+x <- arima.sim(n = 1000, model = list(order = c(1,1,1), ar = 0.6 , ma = 0.5))
+plot.ts(x, main="Série Simulada ARIMA(1,1,1)", ylab="Valores", col="blue")
+```
+
+## Teste de Estacionaridade
+
+Antes de ajustar qualquer modelo, é importante verificar se a série é estacionária.
+
+### Teste KPSS
+
+O **Teste KPSS** verifica se uma série temporal é estacionária ao redor de uma média constante (hipótese nula).
+
+-   **Hipótese Nula (H0)**: A série é estacionária.
+-   **Hipótese Alternativa (Ha)**: A série não é estacionária.
+
+```{r}
+kpss_result <- kpss.test(x)
+print(kpss_result)
+
+if (kpss_result$p.value < 0.05) {
+  print("Rejeitamos a hipótese nula: A série não é estacionária.")
+} else {
+  print("Falha ao rejeitar a hipótese nula: A série é estacionária.")
+}
+```
+
+Como a série é não estacionária, devemos transformá-la em uma série estacionária.
+
+### Determinação do Número de Diferenciações Necessárias
+
+A função `ndiffs` utiliza o teste KPSS para determinar quantas diferenciações são necessárias para tornar a série estacionária.
+
+```{r}
+d <- ndiffs(x, alpha = 0.05)
+print(paste("Número de diferenciações necessárias: ", d))
+```
+
+### Aplicando as Diferenciações
+
+```{r}
+w <- diff(x, differences = d)
+plot.ts(w, main="Série Estacionária (após diferenciação)", ylab="Valores", col="blue")
+```
+
+## Análise da Série Estacionária
+
+Agora que temos uma série estacionária, podemos fazer os gráficos da ACF e PACF.
+
+```{r}
+print(acf(w, main="Função de Autocorrelação (ACF)"))
+print(pacf(w, main="Função de Autocorrelação Parcial (PACF)"))
+```
+
+A ACF demonstra um decaimento sem quebra, praticamente constante para zero. O PACF parece da mesma forma que a ACF, com decaimento constante, totalmente amortizado e sem quebras.
+
+## Ajustando Modelos AR, MA e ARMA
+
+### Verificando um Modelo AR
+
+Supondo que olhamos para o gráfico e entendemos que por algum motivo o Modelo AR(4) seria adequado.
+
+```{r}
+AR <- arima(w, order = c(4,0,0), include.mean = FALSE)
+E_AR <- AR$residuals
+```
+
+### Análise Gráfica dos Resíduos do Modelo AR
+
+```{r}
+plot(E_AR, main="Resíduos do Modelo AR(4)", ylab="Resíduos", col="blue")
+acf(E_AR, main="ACF dos Resíduos AR(4)")
+pacf(E_AR, main="PACF dos Resíduos AR(4)")
+qqnorm(E_AR)
+qqline(E_AR, col = "red")
+```
+
+### Testes Estatísticos para Validar o Modelo AR
+
+Temos que verificar se nossos resíduos são:
+
+-   Normais
+
+-   Independentes
+
+-   Estacionários
+
+#### Teste de Estacionaridade - KPSS
+
+```{r}
+kpss_result_AR <- kpss.test(E_AR)
+print(kpss_result_AR)
+```
+
+#### Teste de Independência - Ljung-Box
+
+```{r}
+box_result_AR <- Box.test(E_AR, lag = 20, type = "Ljung-Box", fitdf = 4)
+print(box_result_AR)
+if (box_result_AR$p.value > 0.05) {
+  print("Falha ao rejeitar a hipótese nula: Os resíduos são independentes.")
+} else {
+  print("Rejeitamos a hipótese nula: Os resíduos não são independentes.")
+}
+```
+
+#### Teste de Normalidade - Shapiro-Wilk
+
+```{r}
+shapiro_result_AR <- shapiro.test(E_AR)
+print(shapiro_result_AR)
+if (shapiro_result_AR$p.value > 0.05) {
+  print("Falha ao rejeitar a hipótese nula: Os resíduos seguem uma distribuição normal.")
+} else {
+  print("Rejeitamos a hipótese nula: Os resíduos não seguem uma distribuição normal.")
+}
+```
+
+### Verificando um Modelo MA
+
+Supondo que olhamos para o gráfico e entendemos que por algum motivo o Modelo MA(6) seria adequado.
+
+```{r}
+MA <- arima(w, order = c(0,0,6), include.mean = FALSE)
+E_MA <- MA$residuals
+```
+
+### Análise Gráfica dos Resíduos do Modelo MA
+
+```{r}
+plot(E_MA, main="Resíduos do Modelo MA(6)", ylab="Resíduos", col="blue")
+acf(E_MA, main="ACF dos Resíduos MA(6)")
+pacf(E_MA, main="PACF dos Resíduos MA(6)")
+qqnorm(E_MA)
+qqline(E_MA, col = "red")
+```
+
+### Testes Estatísticos para Validar o Modelo MA
+
+#### Teste de Estacionaridade - KPSS
+
+```{r}
+kpss_result_MA <- kpss.test(E_MA)
+print(kpss_result_MA)
+```
+
+#### Teste de Independência - Ljung-Box
+
+```{r}
+box_result_MA <- Box.test(E_MA, lag = 20, type = "Ljung-Box", fitdf = 6)
+print(box_result_MA)
+if (box_result_MA$p.value > 0.05) {
+  print("Falha ao rejeitar a hipótese nula: Os resíduos são independentes.")
+} else {
+  print("Rejeitamos a hipótese nula: Os resíduos não são independentes.")
+}
+```
+
+#### Teste de Normalidade - Shapiro-Wilk
+
+```{r}
+shapiro_result_MA <- shapiro.test(E_MA)
+print(shapiro_result_MA)
+if (shapiro_result_MA$p.value > 0.05) {
+  print("Falha ao rejeitar a hipótese nula: Os resíduos seguem uma distribuição normal.")
+} else {
+  print("Rejeitamos a hipótese nula: Os resíduos não seguem uma distribuição normal.")
+}
+```
+
+### Verificando um Modelo ARMA
+
+Supondo que olhamos para o gráfico e entendemos que por algum motivo o Modelo ARMA(1,1) seria adequado.
+
+```{r}
+ARMA <- arima(w, order = c(1,0,1), include.mean = FALSE)
+E_ARMA <- ARMA$residuals
+```
+
+### Análise Gráfica dos Resíduos do Modelo ARMA
+
+```{r}
+plot(E_ARMA, main="Resíduos do Modelo ARMA(1,1)", ylab="Resíduos", col="blue")
+acf(E_ARMA, main="ACF dos Resíduos ARMA(1,1)")
+pacf(E_ARMA, main="PACF dos Resíduos ARMA(1,1)")
+qqnorm(E_ARMA)
+qqline(E_ARMA, col = "red")
+```
+
+### Testes Estatísticos para Validar o Modelo ARMA
+
+#### Teste de Estacionaridade - KPSS
+
+```{r}
+kpss_result_ARMA <- kpss.test(E_ARMA)
+print(kpss_result_ARMA)
+```
+
+#### Teste de Independência - Ljung-Box
+
+```{r}
+box_result_ARMA <- Box.test(E_ARMA, lag = 20, type = "Ljung-Box", fitdf = 2)
+print(box_result_ARMA)
+if (box_result_ARMA$p.value > 0.05) {
+  print("Falha ao rejeitar a hipótese nula: Os resíduos são independentes.")
+} else {
+  print("Rejeitamos a hipótese nula: Os resíduos não são independentes.")
+}
+```
+
+#### Teste de Normalidade - Shapiro-Wilk
+
+```{r}
+shapiro_result_ARMA <- shapiro.test(E_ARMA)
+print(shapiro_result_ARMA)
+if (shapiro_result_ARMA$p.value > 0.05) {
+  print("Falha ao rejeitar a hipótese nula: Os resíduos seguem uma distribuição normal.")
+} else {
+  print("Rejeitamos a hipótese nula: Os resíduos não seguem uma distribuição normal.")
+}
+```
+
+### Comparação de Modelos
+
+Modelo AR(4)
+
+```{r}
+AR
+```
+
+Modelo MA(6)
+
+```{r}
+MA
+```
+
+Modelo ARMA(1,1)
+
+```{r}
+ARMA
+```
+
+### Geração Automática da Ordem do Modelo de Séries Temporais
+
+Podemos usar a função `auto.arima` para identificar automaticamente a
+
+melhor ordem para o modelo ARIMA.
+
+```{r}
+auto_model <- auto.arima(x)
+summary(auto_model)
+```

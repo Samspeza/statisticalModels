@@ -1,0 +1,186 @@
+---
+Séries temporais - Decomposição de série
+---
+
+# DECOMPOSIÇÃO DE SÉRIES TEMPORAIS
+
+***Instalação de Bibliotecas***
+
+```{r}
+#install.packages('ggfortify')
+#install.packages('tseries')
+#install.packages('forecast')
+library(ggfortify)
+library(tseries)
+library(forecast)
+```
+
+***Carregando base de dados***
+
+```{r}
+data(AirPassengers)
+AP <- AirPassengers
+```
+
+O conjunto de dados AirPassenger em R fornece totais mensais de passageiros de uma companhia aérea dos EUA, de 1949 a 1960. Este conjunto de dados já pertence a uma classe de série temporal, portanto, nenhuma manipulação adicional de classe ou data é necessária.
+
+### ANALISE DESCRITIVA
+
+Verificando a classe dos dados
+
+```{r}
+class(AP)
+```
+
+Valores ausentes
+
+```{r}
+sum(is.na(AP))
+```
+
+Frequenia da série
+
+```{r}
+frequency(AP)
+```
+
+Cíclo da série
+
+```{r}
+cycle(AP)
+```
+
+```{r}
+summary(AP)
+```
+
+Plotando o gráfico de series temporais com a função nativa
+
+```{r}
+plot(AP,xlab="Date", ylab = "Número de Passageiros",main="Número de passageiros de 1949 a 1961")
+```
+
+```{r}
+autoplot(AP) + labs(x ="Data", y = "Número de Passageiros", title="Número de passageiros de 1949 a 1961")
+```
+
+## Decomposição Aditiva
+
+```{r}
+decomposeAP <- decompose(AP,"additive")
+autoplot(decomposeAP)
+
+```
+
+```{r}
+decomposeAP <- decompose(AP,"additive")
+plot(decomposeAP)
+
+```
+
+Para saber se temos uma boa decomposição devemos olhar o ruido e verificar se ele está ramdomico. Neste caso aparenta term uma sazonalidade no final da serie.
+
+## Decomposição Multiplicativa
+
+```{r}
+decomposeAP <- decompose(AP,"multiplicative")
+autoplot(decomposeAP)
+```
+
+```{r}
+decomposeAP <- decompose(AP,"multiplicative")
+plot(decomposeAP)
+```
+
+## Passo a Passo : Decomposição
+
+### 1. Modelo Linear
+
+```{r}
+X<- AirPassengers
+tempo <- time(X) # retorna um vetor de tempo
+out <- lm(X ~ tempo)
+plot(X)
+lines(x = tempo, y =out$fitted.values, type = 'l', col = "red")
+
+```
+
+### 2. Modelo polinomial
+
+```{r}
+X <- Nile
+tempo <- as.numeric(time(X))
+out1 <- lm(X~poly(tempo,2)) #polinomio de ordem 2
+out2 <- lm(X~poly(tempo,6)) #polinomio de ordem 6
+plot(X)
+lines(x = tempo, y =out1$fitted.values, type = 'l', col = "red")
+lines(x = tempo, y =out2$fitted.values, type = 'l', col = "blue")
+```
+
+### 3 - Extração de tendencia por filtros: media movel de valores passados
+
+Quando utilizamos o periodo igual ao quantidade de meses do ciclo dos dados, iremos neutralizar todo comportamento sazonal da série
+
+```{r}
+X <- AirPassengers
+sma6 <- filter(X, rep (1/6,6),sides =1)
+sma12 <- filter(X,rep(1/12,12),sides =1)
+plot(X)
+lines(x = X, y =sma6, type = 'l', col = "red")
+lines(x = X, y =sma12, type = "l", col = "blue")
+```
+
+-   rep -\> pesos -- 1/12 nos 12 ultimos pontos
+
+-   sides = 1 -\> valores passados
+
+-   sides = 2 -\> media movel simetrica
+
+-   rep (1/6) -\> últimos seis pontos
+
+-   rep (1/12) -\> últimos 12 pontos
+
+Quanto maior o numero de pontos, mais suavizado
+
+### 4 - media movel de valores simetrica
+
+Comparando a média movel simetrica e considerando valores passados
+
+```{r}
+X<- AirPassengers
+pass <- filter(X, rep(1/5,5),sides =1)
+sim <- filter(X,rep(1/5,5),sides =2)
+plot(X)
+lines(x = X, y =pass, type = 'l', col = "red")
+lines(x = X, y =sim, type = "l", col = "blue")
+```
+
+Média movel dos valores passados é sempre atrasada - uma vez que considera apenas valores passados A mais utilizada é a simetrica por nao apresentar esse atraso
+
+## Extraindo a Sazonalidade
+
+```{r}
+X <- AirPassengers
+T<- filter(X,rep(1/13,13),sides =2)
+Z <- X - T
+```
+
+O Z é a serie sem a tendencia ou seja sazonalidade + ruido
+
+A sazonalidade é feita pegando a media de cada mes. Ou seja pega todos os meses de janeiro e retira a media, pega todos os meses de fevereiro e retira a media.
+
+Fazendo todo o processo e replicando ele temos a sazonaldiade
+
+```{r}
+n.periodos <- length(X)/12
+MS <- t(matrix(data = Z, nrow = 12))
+S <- colMeans(MS, na.rm = 'T')
+S <- ts(rep(S,n.periodos),start = start(X) , frequency = frequency(X))
+```
+
+## Ruído / resíduos: E = X -- T -- S
+
+```{r}
+E <- X -  T - S
+plot(cbind(X,T,S,E), main =, plot.type= 'm', lwd = 2)
+```

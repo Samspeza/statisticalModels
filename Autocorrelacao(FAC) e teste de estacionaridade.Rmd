@@ -1,0 +1,259 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+# Correlograma e Teste de Estacionaridade
+
+Verificar para quais defazagens existe autocorrelação significativa
+
+```{r}
+#install.packages("tseries")
+#install.packages("urca")
+library(tseries)
+library(urca)
+```
+
+### Exemplo ruído Branco
+
+Neste caso simulamos 200 pontos de uma distribuição normal i.i.d.
+
+Oberve que na defasagem 0 a correlação sempre será 1. E a partir dessa
+defazagem observa-se todos os valores dentro do intervalo.
+
+Podemso então dizer que essa série não tem autocorrelações
+
+```{r}
+x<- rnorm(200)
+#par(mfrow=c(2,1))
+plot.ts(x)
+acf(x,main='')
+```
+
+***Teste de Estacionaridade***
+
+***Teste de Dickey-Fuller Aumentado (ADF)*** O teste de Dickey-Fuller
+Aumentado (ADF) é um teste de hipótese usado para verificar a
+estacionaridade de uma série temporal.
+
+-   **Hipótese Nula (H0)**: A série temporal tem uma raiz unitária (não
+    estacionária).
+
+-   **Hipótese Alternativa (H1)**: A série temporal é estacionária (sem
+    raiz unitária).
+
+-   **Rejeitar H0 (valor** $p$ \< 0.05): A série é estacionária.
+
+-   **Não rejeitar H0 (valor** $p$ \> 0.05): A série não é estacionária
+    (tem raiz unitária).
+
+```{r}
+adf_test1 <- adf.test(x)
+print(adf_test1)
+```
+
+#### Teste KPSS (Kwiatkowski-Phillips-Schmidt-Shin)
+
+O teste KPSS é usado para verificar a estacionaridade de uma série
+temporal, mas ao contrário do teste ADF, sua hipótese nula é que a série
+é estacionária.
+
+##### Hipóteses:
+
+-   **Hipótese Nula (H0)**: A série temporal é estacionária.
+
+-   **Hipótese Alternativa (H1)**: A série temporal não é estacionária.
+
+-   **Rejeitar H0 (valor KPSS grande )**: A série não é estacionária.
+
+-   **Não rejeitar H0 (valor KPSS pequeno)**: A série é estacionária.
+
+```{r}
+kpss_test1 <- ur.kpss(x)
+summary(kpss_test1)
+
+```
+
+### Exemplo 2 - Modelo AR(1) : X = 0.8Xt-1 + e
+
+Observe que mesmo que alguns pontos fogem do zero, a média zero
+permanece ao longo do tempo .
+
+Como em um modelo autorregressivo o ponto posterior depende do ponto
+anteriror observamos que a defasagem ainda tem valor, e isso acaba sendo
+propagado para duas defazagens tres defasagens e assim sucessivamente.
+
+Então apra interpretarmos esse grafico temos, seria o quanto xt depende
+do xt-1 , oq uanto xt depende do xt-2 e assim sucessivamente
+
+```{r}
+x<- arima.sim(n=200, rand.gen = rnorm, list(ar = 0.8))
+#par(mfrow=c(2,1))
+plot.ts(x)
+acf(x,main='')
+```
+
+***Teste de Estacionaridade***
+
+***Teste de Dickey-Fuller Aumentado (ADF)*** O teste de Dickey-Fuller
+Aumentado (ADF) é um teste de hipótese usado para verificar a
+estacionaridade de uma série temporal.
+
+-   **Hipótese Nula (H0)**: A série temporal tem uma raiz unitária (não
+    estacionária).
+
+-   **Hipótese Alternativa (H1)**: A série temporal é estacionária (sem
+    raiz unitária).
+
+-   **Rejeitar H0 (valor** $p$ \< 0.05): A série é estacionária.
+
+-   **Não rejeitar H0 (valor** $p$ \> 0.05): A série não é estacionária
+    (tem raiz unitária).
+
+```{r}
+adf_test1 <- adf.test(x)
+print(adf_test1)
+```
+
+#### Teste KPSS (Kwiatkowski-Phillips-Schmidt-Shin)
+
+O teste KPSS é usado para verificar a estacionaridade de uma série
+temporal, mas ao contrário do teste ADF, sua hipótese nula é que a série
+é estacionária.
+
+##### Hipóteses:
+
+-   **Hipótese Nula (H0)**: A série temporal é estacionária.
+
+-   **Hipótese Alternativa (H1)**: A série temporal não é estacionária.
+
+-   **Rejeitar H0 (valor KPSS grande )**: A série não é estacionária.
+
+-   **Não rejeitar H0 (valor KPSS pequeno)**: A série é estacionária.
+
+```{r}
+kpss_test1 <- ur.kpss(x)
+summary(kpss_test1)
+
+```
+
+### Exemplo 3 - Modelo AR(1) : X = -0.8Xt-1 + e
+
+Agora observe que pela inclusão do sinal de menos a autocorrelaçõ
+alterna entre positivo e negativo.
+
+```{r}
+x<- arima.sim(n=200, rand.gen = rnorm, list(ar = -0.8))
+#par(mfrow=c(2,1))
+plot.ts(x)
+acf(x,main='')
+
+```
+
+***Teste de Estacionaridade***
+
+***Teste de Dickey-Fuller Aumentado (ADF)*** O teste de Dickey-Fuller
+Aumentado (ADF) é um teste de hipótese usado para verificar a
+estacionaridade de uma série temporal.
+
+-   **Hipótese Nula (H0)**: A série temporal tem uma raiz unitária (não
+    estacionária).
+
+-   **Hipótese Alternativa (H1)**: A série temporal é estacionária (sem
+    raiz unitária).
+
+-   **Rejeitar H0 (valor** $p$ \< 0.05): A série é estacionária.
+
+-   **Não rejeitar H0 (valor** $p$ \> 0.05): A série não é estacionária
+    (tem raiz unitária).
+
+```{r}
+adf_test1 <- adf.test(x)
+print(adf_test1)
+```
+
+#### Teste KPSS (Kwiatkowski-Phillips-Schmidt-Shin)
+
+O teste KPSS é usado para verificar a estacionaridade de uma série
+temporal, mas ao contrário do teste ADF, sua hipótese nula é que a série
+é estacionária.
+
+##### Hipóteses:
+
+-   **Hipótese Nula (H0)**: A série temporal é estacionária.
+
+-   **Hipótese Alternativa (H1)**: A série temporal não é estacionária.
+
+-   **Rejeitar H0 (valor KPSS grande )**: A série não é estacionária.
+
+-   **Não rejeitar H0 (valor KPSS pequeno)**: A série é estacionária.
+
+```{r}
+kpss_test1 <- ur.kpss(x)
+summary(kpss_test1)
+
+```
+
+### Exemplo 4 - Passeio aleatorio : Xt = Xt-1 + e
+
+O passeio aleatorio depende exclusivamente do ponto anterior
+
+O gráfico da série observamos que a media nao pe constante
+
+No grafico ACF observamos um comportamento títico de séries não
+estacionárias, observe como ele demora para chegar ao zero. Decaimento
+lento e constante ao longo do tempo
+
+```{r}
+e<- rnorm(200)
+x <- cumsum(e)
+#par(mfrow=c(2,1))
+plot.ts(x)
+acf(x,main='')
+```
+
+***Teste de Estacionaridade***
+
+***Teste de Dickey-Fuller Aumentado (ADF)*** O teste de Dickey-Fuller
+Aumentado (ADF) é um teste de hipótese usado para verificar a
+estacionaridade de uma série temporal.
+
+-   **Hipótese Nula (H0)**: A série temporal tem uma raiz unitária (não
+    estacionária).
+
+-   **Hipótese Alternativa (H1)**: A série temporal é estacionária (sem
+    raiz unitária).
+
+-   **Rejeitar H0 (valor** $p$ \< 0.05): A série é estacionária.
+
+-   **Não rejeitar H0 (valor** $p$ \> 0.05): A série não é estacionária
+    (tem raiz unitária).
+
+```{r}
+adf_test1 <- adf.test(x)
+print(adf_test1)
+```
+
+#### Teste KPSS (Kwiatkowski-Phillips-Schmidt-Shin)
+
+O teste KPSS é usado para verificar a estacionaridade de uma série
+temporal, mas ao contrário do teste ADF, sua hipótese nula é que a série
+é estacionária.
+
+##### Hipóteses:
+
+-   **Hipótese Nula (H0)**: A série temporal é estacionária.
+
+-   **Hipótese Alternativa (H1)**: A série temporal não é estacionária.
+
+-   **Rejeitar H0 (valor KPSS grande )**: A série não é estacionária.
+
+-   **Não rejeitar H0 (valor KPSS pequeno)**: A série é estacionária.
+
+```{r}
+kpss_test1 <- ur.kpss(x)
+summary(kpss_test1)
+```
